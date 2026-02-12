@@ -16,17 +16,23 @@ import java.math.BigDecimal;
 @Setter
 @AllArgsConstructor
 @RequiredArgsConstructor
-@Table(name = "TBL_ITEM")
-public class ItemEntity extends BaseEntity {
+@Table(name = "TBL_OFFER")
+public class OfferEntity extends BaseEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID")
     private Long id;
 
-    @Column(name = "NAME", nullable = false)
-    private String name;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "ITEM_ID")
+    private ItemEntity item;
 
-    @Column(name = "PRICE", nullable = false)
-    private BigDecimal price;
+    @Column(name = "QUANTITY", nullable = false)
+    private Long quantity;
+
+    @Column(name = "OFFER_PRICE", nullable = false)
+    private BigDecimal offerPrice;
+
+
 }
