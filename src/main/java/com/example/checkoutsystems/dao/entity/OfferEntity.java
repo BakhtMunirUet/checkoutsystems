@@ -9,6 +9,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @SuperBuilder(toBuilder = true)
@@ -33,6 +34,13 @@ public class OfferEntity extends BaseEntity{
 
     @Column(name = "OFFER_PRICE", nullable = false)
     private BigDecimal offerPrice;
+
+    @Column(name = "START_DATE", nullable = false)
+    private LocalDateTime startDate;
+
+    @Column(name = "END_DATE", nullable = false)
+    private LocalDateTime endDate;
+
 
 
 }
