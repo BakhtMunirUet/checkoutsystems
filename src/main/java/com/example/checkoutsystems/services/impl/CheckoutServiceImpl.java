@@ -10,6 +10,7 @@ import com.example.checkoutsystems.dao.repository.ItemRepository;
 import com.example.checkoutsystems.dao.repository.OfferRepository;
 import com.example.checkoutsystems.dto.CheckoutItemDto;
 import com.example.checkoutsystems.dto.CheckoutDto;
+import com.example.checkoutsystems.exception.InputValidationException;
 import com.example.checkoutsystems.mapper.CheckoutMapper;
 import com.example.checkoutsystems.services.CheckoutService;
 import jakarta.transaction.Transactional;
@@ -74,7 +75,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     private ItemEntity findItem(Long itemId) {
         return itemRepository.findById(itemId)
-                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+                .orElseThrow(() -> new InputValidationException("Item not found: " + itemId));
     }
 
     private OfferEntity findValidOffer(Long itemId, LocalDateTime now) {
