@@ -32,6 +32,6 @@ public class CheckoutEntity extends BaseEntity {
     @Column(name = "TOTAL_DISCOUNT")
     private BigDecimal totalDiscount;
 
-    @OneToMany(mappedBy = "checkout", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "checkout", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CheckoutItemEntity> items = new ArrayList<>();
 }

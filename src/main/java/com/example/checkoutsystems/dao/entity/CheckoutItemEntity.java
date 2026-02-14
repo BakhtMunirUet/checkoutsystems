@@ -48,7 +48,7 @@ public class CheckoutItemEntity extends BaseEntity {
     @Column(name = "TIMES_OFFER_APPLIED")
     private Long timesOfferApplied;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "CHECKOUT_ID")
     private CheckoutEntity checkout;
 }

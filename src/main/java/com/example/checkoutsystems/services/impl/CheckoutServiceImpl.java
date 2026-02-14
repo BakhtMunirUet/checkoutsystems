@@ -12,6 +12,7 @@ import com.example.checkoutsystems.dto.CheckoutItemDto;
 import com.example.checkoutsystems.dto.CheckoutDto;
 import com.example.checkoutsystems.mapper.CheckoutMapper;
 import com.example.checkoutsystems.services.CheckoutService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -39,95 +39,99 @@ public class CheckoutServiceImpl implements CheckoutService {
 
 
     @Override
+    @Transactional
     public CheckoutDto checkout(CheckoutDto dto) {
-
-        BigDecimal total = BigDecimal.ZERO;
-        BigDecimal totalDiscount = BigDecimal.ZERO;
+        LocalDateTime now = LocalDateTime.now();
         CheckoutEntity checkoutEntity = new CheckoutEntity();
         checkoutEntity.setItems(new ArrayList<>());
 
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+
         for (CheckoutItemDto cartItem : dto.items()) {
 
-            ItemEntity itemEntity = itemRepository.findById(cartItem.itemId())
-                    .orElseThrow(() -> new RuntimeException("Item not found: " + cartItem.itemId()));
+            ItemEntity item = findItem(cartItem.itemId());
+            OfferEntity offer = findValidOffer(item.getId(), now);
 
-            Long quantity = cartItem.quantity();
-            BigDecimal itemPrice = itemEntity.getPrice();
+            ItemCalculation calc = calculateItemTotals(item, offer, cartItem.quantity());
 
-            LocalDateTime now = LocalDateTime.now();
+            total = total.add(calc.itemTotal());
+            totalDiscount = totalDiscount.add(calc.discount());
 
-            var offerEntity = offerRepository.findByItemId(itemEntity.getId())
-                    .filter(offer -> !now.isBefore(offer.getStartDate()) && !now.isAfter(offer.getEndDate()));
-
-            BigDecimal itemTotal;
-            BigDecimal discountApplied = BigDecimal.ZERO;
-            long offerAppliedTimes = 0;
-            BigDecimal originalTotalPrice = BigDecimal.ZERO;
-
-
-            /**
-             * Check here if the item have price and it is still valid
-             */
-
-            if (offerEntity.isPresent()) {
-                OfferEntity offer = offerEntity.get();
-                Long offerQty = offer.getQuantity();
-                BigDecimal offerPrice = offer.getOfferPrice();
-
-                /**
-                 * Calculation the offer price base on quantity
-                 * how many times offer need to applied offerAppliedTimes = quantity / offerQty;
-                 * How many times not to applied Long remainingQty = quantity % offerQty;
-                 */
-                offerAppliedTimes = quantity / offerQty;
-                Long remainingQty = quantity % offerQty;
-
-                /**
-                 * Offer Price Calculation and Total Price calculation
-                 */
-                BigDecimal offerPart = offerPrice.multiply(BigDecimal.valueOf(offerAppliedTimes));
-                BigDecimal normalPart =
-                        itemPrice.multiply(BigDecimal.valueOf(remainingQty));
-
-
-
-                itemTotal = offerPart.add(normalPart);
-                originalTotalPrice = itemPrice.multiply(BigDecimal.valueOf(quantity));
-
-                discountApplied = originalTotalPrice.subtract(itemTotal);
-
-                totalDiscount = totalDiscount.add(discountApplied);
-
-            } else {
-                itemTotal = itemPrice.multiply(BigDecimal.valueOf(quantity));
-            }
-
-            total = total.add(itemTotal);
-
-
-            checkoutEntity.getItems().add(
-                    CheckoutItemEntity.builder()
-                            .itemId(itemEntity.getId())
-                            .itemName(itemEntity.getName())
-                            .quantity(cartItem.quantity())
-                            .unitPrice(itemPrice)
-                            .totalPrice(itemTotal)
-                            .originalTotalPrice(originalTotalPrice)
-                            .discountApplied(discountApplied)
-                            .timesOfferApplied(offerAppliedTimes)
-                            .createdDate(LocalDateTime.now())
-                            .checkout(checkoutEntity)
-                            .build()
-            );
-
-
+            checkoutEntity.getItems().add(buildCheckoutItemEntity(
+                    checkoutEntity, item, cartItem.quantity(), calc
+            ));
         }
 
+        checkoutEntity.setCreatedDate(now);
         checkoutEntity.setTotalPrice(total);
         checkoutEntity.setTotalDiscount(totalDiscount);
-        checkoutEntity.setCreatedDate(LocalDateTime.now());
 
         return checkoutMapper.checkoutToDo(checkoutRepository.save(checkoutEntity));
 
     }
+
+
+    private ItemEntity findItem(Long itemId) {
+        return itemRepository.findById(itemId)
+                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+    }
+
+    private OfferEntity findValidOffer(Long itemId, LocalDateTime now) {
+        return offerRepository.findByItemId(itemId)
+                .filter(o -> !now.isBefore(o.getStartDate()) && !now.isAfter(o.getEndDate()))
+                .orElse(null);
+    }
+
+    private ItemCalculation calculateItemTotals(ItemEntity item, OfferEntity offer, long qty) {
+
+        BigDecimal unitPrice = item.getPrice();
+        BigDecimal originalTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
+
+        if (offer == null) {
+            return new ItemCalculation(originalTotal, BigDecimal.ZERO, 0, originalTotal);
+        }
+
+        long offerQty = offer.getQuantity();
+        long offerTimes = qty / offerQty;
+        long remainder = qty % offerQty;
+
+        BigDecimal offerPricePart =
+                offer.getOfferPrice().multiply(BigDecimal.valueOf(offerTimes));
+
+        BigDecimal normalPart =
+                unitPrice.multiply(BigDecimal.valueOf(remainder));
+
+        BigDecimal itemTotal = offerPricePart.add(normalPart);
+        BigDecimal discount = originalTotal.subtract(itemTotal);
+
+        return new ItemCalculation(itemTotal, discount, offerTimes, originalTotal);
+    }
+
+    private CheckoutItemEntity buildCheckoutItemEntity(
+            CheckoutEntity checkout,
+            ItemEntity item,
+            long qty,
+            ItemCalculation calc) {
+
+        return CheckoutItemEntity.builder()
+                .itemId(item.getId())
+                .itemName(item.getName())
+                .quantity(qty)
+                .unitPrice(item.getPrice())
+                .totalPrice(calc.itemTotal())
+                .originalTotalPrice(calc.originalTotal())
+                .discountApplied(calc.discount())
+                .timesOfferApplied(calc.offerTimes())
+                .createdDate(LocalDateTime.now())
+                .checkout(checkout)
+                .build();
+    }
+
+    private record ItemCalculation(
+            BigDecimal itemTotal,
+            BigDecimal discount,
+            long offerTimes,
+            BigDecimal originalTotal
+    ) {}
 }
