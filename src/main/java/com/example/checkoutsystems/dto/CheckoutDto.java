@@ -1,5 +1,6 @@
 package com.example.checkoutsystems.dto;
 
+import jakarta.validation.Valid;
 import lombok.Builder;
 
 import java.math.BigDecimal;
@@ -11,5 +12,5 @@ public record CheckoutDto(
         BigDecimal totalPrice,
 
         BigDecimal totalDiscount,
-        List<CheckoutItemDto> items) {
+        @Valid List<CheckoutItemDto> items) {
 }
