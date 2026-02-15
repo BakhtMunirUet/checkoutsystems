@@ -1,6 +1,7 @@
 package com.example.checkoutsystems.dto;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
 import java.math.BigDecimal;
@@ -12,5 +13,8 @@ public record CheckoutDto(
         BigDecimal totalPrice,
 
         BigDecimal totalDiscount,
-        @Valid List<CheckoutItemDto> items) {
+
+        @NotNull(message = "Item List can not be null")
+        @Valid
+        List<CheckoutItemDto> items) {
 }
