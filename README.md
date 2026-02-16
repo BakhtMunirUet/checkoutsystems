@@ -51,6 +51,12 @@ mvn clean install
 
 ## Usage
 ### Run the application
+Before starting the application, please run the Flyway migration:
+```bash
+mvn flyway:migrate
+```
+
+
 Using Maven:
 ```bash
 mvn spring-boot:run
