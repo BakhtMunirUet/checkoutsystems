@@ -201,4 +201,70 @@ class CheckoutServiceImplTest {
         assertEquals(BigDecimal.valueOf(0.0), result.totalDiscount());
     }
 
+    @Test
+    void givenMultipleItemsWithMixedOffers_whenCheckout_thenCalculateTotalsCorrectly() {
+        ItemEntity banana = ItemEntity.builder()
+                .id(2L)
+                .name("Banana")
+                .price(BigDecimal.valueOf(0.20))
+                .build();
+
+        OfferEntity bananaOffer = OfferEntity.builder()
+                .id(2L)
+                .item(banana)
+                .quantity(3L)
+                .offerPrice(BigDecimal.valueOf(0.50))
+                .startDate(now.minusDays(1))
+                .endDate(now.plusDays(1))
+                .build();
+
+        CheckoutItemDto appleDto = CheckoutItemDto.builder()
+                .id(1L).itemId(1L).itemName("apple").quantity(2L).build();
+
+        CheckoutItemDto bananaDto = CheckoutItemDto.builder()
+                .id(2L).itemId(2L).itemName("banana").quantity(3L).build();
+
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(apple));
+        when(itemRepository.findById(2L)).thenReturn(Optional.of(banana));
+        when(offerRepository.findByItemId(1L)).thenReturn(Optional.empty());
+        when(offerRepository.findByItemId(2L)).thenReturn(Optional.of(bananaOffer));
+        when(checkoutRepository.save(any(CheckoutEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkoutMapper.checkoutToDo(any()))
+                .thenReturn(new CheckoutDto(1L, BigDecimal.valueOf(1.10), BigDecimal.valueOf(0.10), List.of(appleDto, bananaDto)));
+
+        CheckoutDto result = checkoutService.checkout(
+                CheckoutDto.builder().items(List.of(appleDto, bananaDto)).build()
+        );
+
+        assertNotNull(result);
+        assertEquals(BigDecimal.valueOf(1.10), result.totalPrice());
+        assertEquals(BigDecimal.valueOf(0.10), result.totalDiscount());
+    }
+
+    @Test
+    void givenItemQuantityBelowOffer_whenCheckout_thenNoDiscountApplied() {
+        CheckoutItemDto itemDto = CheckoutItemDto.builder()
+                .id(1L)
+                .itemId(1L)
+                .itemName("apple")
+                .quantity(1L) // offer requires 2
+                .build();
+
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(apple));
+        when(offerRepository.findByItemId(1L)).thenReturn(Optional.of(appleOffer));
+        when(checkoutRepository.save(any(CheckoutEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkoutMapper.checkoutToDo(any()))
+                .thenReturn(new CheckoutDto(1L, BigDecimal.valueOf(0.30), BigDecimal.ZERO, List.of(itemDto)));
+
+        CheckoutDto result = checkoutService.checkout(
+                CheckoutDto.builder().items(List.of(itemDto)).build()
+        );
+
+        assertEquals(BigDecimal.valueOf(0.30), result.totalPrice());
+        assertEquals(BigDecimal.ZERO, result.totalDiscount());
+    }
+
+
+
+
 }
